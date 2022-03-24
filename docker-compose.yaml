@@ -1,0 +1,99 @@
+version: '3.7'
+
+networks:
+  proxy:
+    external:
+      name: proxy
+  default:
+    driver: bridge
+services:
+  traefik:
+    image: traefik:latest
+    restart: unless-stopped
+    # security_opt:
+    #   - no-new-privileges:true
+    networks:
+      - proxy
+    command:
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web-secure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--log.level=DEBUG"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--providers.file.directory=/FileProvider/"
+      - "--providers.file.watch=true"
+      - "--providers.docker=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=proxy"
+      - "--providers.docker.swarmMode=false"
+      - "--serverstransport.insecureskipverify=false"
+      - "--certificatesresolvers.le.acme.dnschallenge=true"
+      - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
+      - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53"
+    environment:
+      CF_API_EMAIL: ${CLOUDFLARE_EMAIL}
+      CF_API_KEY: ${CLOUDFLARE_API_TOKEN}
+      CF_DNS_API_TOKEN: ${CLOUDFLARE_API_KEY}
+      CF_ZONE_API_TOKEN: ${CLOUDFLARE_ZONE_API_TOKEN}
+    container_name: traefik
+    labels:
+      ## Services - API
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.alexpedersen.dev`)"
+      - "traefik.http.routers.traefik-rtr.entrypoints=web-secure"
+      - "traefik.http.routers.traefik-rtr.tls=true"
+      - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
+      - "traefik.http.routers.traefik-rtr.service=api@internal"
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # So that Traefik can listen to the Docker events
+      - ./FileProvider/:/FileProvider/
+  # Cloudflare-Companion - Automatic CNAME DNS Creation
+  cf-companion:
+    container_name: cf-companion
+    image: tiredofit/traefik-cloudflare-companion:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # TODO: move to env file
+    environment:
+      - TIMEZONE=Europe/Madrid
+      - TRAEFIK_VERSION=2
+      - CF_EMAIL=${CLOUDFLARE_EMAIL} # Same as traefik
+      - CF_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - TARGET_DOMAIN=ddns.${CLOUDFLARE_ZONE}
+      - DOMAIN1=${CLOUDFLARE_ZONE}
+      - DOMAIN1_ZONE_ID=${CLOUDFLARE_ZONE_ID} # Copy from Cloudflare Overview page
+      - DOMAIN1_PROXIED=TRUE
+    labels:
+      # Add hosts specified in rules here to force cf-companion to create the CNAMEs
+      # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps
+      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`console-buildquest.alexpedersen.dev`) || HostHeader(`api-buildquest.alexpedersen.dev`)"
+  cf-ddns:
+    container_name: cf-ddns
+    image: oznu/cloudflare-ddns:latest
+    restart: always
+    environment:
+      - API_KEY=${CLOUDFLARE_API_KEY}
+      - ZONE=${CLOUDFLARE_ZONE}
+      - SUBDOMAIN=ddns
+      - PROXIED=true
+      - RRTYPE=A
+      - DELETE_ON_STOP=false
+      - DNS_SERVER=1.1.1.1
