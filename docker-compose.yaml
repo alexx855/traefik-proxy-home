@@ -1,5 +1,4 @@
 version: '3.7'
-
 networks:
   proxy:
     external:
@@ -20,6 +19,8 @@ services:
       - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--log.level=DEBUG"
+      # - "--log.filePath=/path/to/traefik.log"
+      # - "--log.format=json"
       - "--api.dashboard=true"
       - "--api.insecure=false"
       - "--providers.file.directory=/FileProvider/"
@@ -34,20 +35,52 @@ services:
       - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
       - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53"
+      ## Metrics prometheus
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
+      # - "--entryPoints.metrics.address=:8080"
+      # - "--metrics.prometheus.entryPoint=metrics"
+      # - "--metrics.prometheus.manualrouting=true"
+      # Metrics datadog
+      # - --metrics.datadog=true
+      # - --metrics.datadog.pushInterval=10s
+      # Tracing
+      - "--tracing.datadog=true"
+      # Access log
+      - "--accesslog.filepath=/path/to/access.log"
+      # - "--accesslog.format=json"
+      # - "--accesslog.fields.defaultmode=keep"
+      # - "--accesslog.fields.names.ClientUsername=drop"
+      # - "--accesslog.fields.headers.defaultmode=keep"
+      # - "--accesslog.fields.headers.names.User-Agent=redact"
+      # - "--accesslog.fields.headers.names.Authorization=drop"
+      # - "--accesslog.fields.headers.names.Content-Type=keep"
     environment:
+      TZ: ${TZ-"US/Alaska"}
       CF_API_EMAIL: ${CLOUDFLARE_EMAIL}
       CF_API_KEY: ${CLOUDFLARE_API_TOKEN}
       CF_DNS_API_TOKEN: ${CLOUDFLARE_API_KEY}
       CF_ZONE_API_TOKEN: ${CLOUDFLARE_ZONE_API_TOKEN}
     container_name: traefik
     labels:
-      ## Services - API
+      # Middlewares
+      - "traefik.http.middlewares.basic-auth.basicauth.users=alexx855:$$apr1$$iQr0XxbE$$g9sf1Omcb98ZSRm1ynINj1"
+      # - "traefik.http.middlewares.basic-auth.basicauth.removeheader=true"
+      # Services - API
       - "traefik.enable=true"
       - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.alexpedersen.dev`)"
       - "traefik.http.routers.traefik-rtr.entrypoints=web-secure"
       - "traefik.http.routers.traefik-rtr.tls=true"
       - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
       - "traefik.http.routers.traefik-rtr.service=api@internal"
+      - "traefik.http.routers.traefik-rtr.middlewares=basic-auth"
+      # Metrics
+      # - "traefik.http.routers.metrics.rule=Host(`metrics-traefik.alexpedersen.dev`)"
+      # - "traefik.http.routers.metrics.entrypoints=web-secure"
+      # - "traefik.http.routers.metrics.tls=true"
+      # - "traefik.http.routers.metrics.tls.certresolver=le"
+      # - "traefik.http.routers.metrics.service=prometheus@internal"
+      # - "traefik.http.routers.metrics.middlewares=basic-auth"
     ports:
       - target: 80
         published: 80
@@ -84,7 +117,7 @@ services:
     labels:
       # Add hosts specified in rules here to force cf-companion to create the CNAMEs
       # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps
-      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`console-buildquest.alexpedersen.dev`) || HostHeader(`api-buildquest.alexpedersen.dev`)"
+      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`console-buildquest.alexpedersen.dev`) || HostHeader(`api-buildquest.alexpedersen.dev`) || HostHeader(`metrics-home.alexpedersen.dev`)"
   cf-ddns:
     container_name: cf-ddns
     image: oznu/cloudflare-ddns:latest
