@@ -1,86 +1,52 @@
 version: '3.7'
-networks:
-  proxy:
-    external:
-      name: proxy
-  default:
-    driver: bridge
 services:
   traefik:
     image: traefik:latest
     restart: unless-stopped
-    # security_opt:
-    #   - no-new-privileges:true
-    networks:
-      - proxy
     command:
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web-secure.address=:443"
+      # http to https redirect
       - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--log.level=DEBUG"
-      # - "--log.filePath=/path/to/traefik.log"
-      # - "--log.format=json"
       - "--api.dashboard=true"
       - "--api.insecure=false"
-      - "--providers.file.directory=/FileProvider/"
-      - "--providers.file.watch=true"
       - "--providers.docker=true"
-      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=proxy"
+      - "--providers.file.watch=true"
+      - "--providers.file.directory=/FileProvider/"
       - "--providers.docker.swarmMode=false"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=true"
       - "--serverstransport.insecureskipverify=false"
       - "--certificatesresolvers.le.acme.dnschallenge=true"
       - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
       - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53"
-      ## Metrics prometheus
+      # Prometheus  
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
-      # - "--entryPoints.metrics.address=:8080"
-      # - "--metrics.prometheus.entryPoint=metrics"
-      # - "--metrics.prometheus.manualrouting=true"
-      # Metrics datadog
-      # - --metrics.datadog=true
-      # - --metrics.datadog.pushInterval=10s
-      # Tracing
-      - "--tracing.datadog=true"
-      # Access log
-      - "--accesslog.filepath=/path/to/access.log"
-      # - "--accesslog.format=json"
-      # - "--accesslog.fields.defaultmode=keep"
-      # - "--accesslog.fields.names.ClientUsername=drop"
-      # - "--accesslog.fields.headers.defaultmode=keep"
-      # - "--accesslog.fields.headers.names.User-Agent=redact"
-      # - "--accesslog.fields.headers.names.Authorization=drop"
-      # - "--accesslog.fields.headers.names.Content-Type=keep"
+      - "--entryPoints.metrics.address=:8080"
+      - "--metrics.prometheus.entryPoint=metrics"
+      - "--metrics.prometheus.manualrouting=true"
+      # TODO: test datadog instead of prometheus, it has tracing support
+      # - "--metrics.datadog=true"
+      # - "--metrics.datadog.pushInterval=10s"
+      # - "--tracing.datadog=true"
     environment:
-      TZ: ${TZ-"US/Alaska"}
-      CF_API_EMAIL: ${CLOUDFLARE_EMAIL}
-      CF_API_KEY: ${CLOUDFLARE_API_TOKEN}
-      CF_DNS_API_TOKEN: ${CLOUDFLARE_API_KEY}
-      CF_ZONE_API_TOKEN: ${CLOUDFLARE_ZONE_API_TOKEN}
+      CF_API_EMAIL: ${CF_API_EMAIL}
+      CF_API_KEY: ${CF_API_KEY}
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
     container_name: traefik
     labels:
-      # Middlewares
-      - "traefik.http.middlewares.basic-auth.basicauth.users=alexx855:$$apr1$$iQr0XxbE$$g9sf1Omcb98ZSRm1ynINj1"
-      # - "traefik.http.middlewares.basic-auth.basicauth.removeheader=true"
-      # Services - API
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.alexpedersen.dev`)"
+      - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.${CF_DOMAIN}`)"
       - "traefik.http.routers.traefik-rtr.entrypoints=web-secure"
       - "traefik.http.routers.traefik-rtr.tls=true"
       - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
       - "traefik.http.routers.traefik-rtr.service=api@internal"
-      - "traefik.http.routers.traefik-rtr.middlewares=basic-auth"
-      # Metrics
-      # - "traefik.http.routers.metrics.rule=Host(`metrics-traefik.alexpedersen.dev`)"
-      # - "traefik.http.routers.metrics.entrypoints=web-secure"
-      # - "traefik.http.routers.metrics.tls=true"
-      # - "traefik.http.routers.metrics.tls.certresolver=le"
-      # - "traefik.http.routers.metrics.service=prometheus@internal"
-      # - "traefik.http.routers.metrics.middlewares=basic-auth"
+      # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"
+      # - "traefik.http.routers.grafana.middlewares=test-basic-auth@file"
     ports:
       - target: 80
         published: 80
@@ -90,43 +56,47 @@ services:
         published: 443
         protocol: tcp
         mode: host
-      - target: 8080
-        published: 8080
-        protocol: tcp
-        mode: host
+      # # traefik dashboard
+      # - target: 8080
+      #   published: 8080
+      #   # protocol: tcp
+      #   mode: ingress 
+
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock # So that Traefik can listen to the Docker events
-      - ./FileProvider/:/FileProvider/
-  # Cloudflare-Companion - Automatic CNAME DNS Creation
+      - "/var/run/docker.sock:/var/run/docker.sock" # So Traefik can listen to the Docker events
+      - ./FileProvider/:/FileProvider/ # So Traefik can read the dynamic configuration file
+  # Cloudflare automatic CNAME DNS creation
   cf-companion:
     container_name: cf-companion
     image: tiredofit/traefik-cloudflare-companion:latest
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    # TODO: move to env file
     environment:
-      - TIMEZONE=Europe/Madrid
-      - TRAEFIK_VERSION=2
-      - CF_EMAIL=${CLOUDFLARE_EMAIL} # Same as traefik
-      - CF_TOKEN=${CLOUDFLARE_API_TOKEN}
-      - TARGET_DOMAIN=ddns.${CLOUDFLARE_ZONE}
-      - DOMAIN1=${CLOUDFLARE_ZONE}
-      - DOMAIN1_ZONE_ID=${CLOUDFLARE_ZONE_ID} # Copy from Cloudflare Overview page
-      - DOMAIN1_PROXIED=TRUE
+      - TIMEZONE=${TZ}
+      - CF_EMAIL=${CF_API_EMAIL}
+      - CF_TOKEN=${CF_API_KEY}
+      - TARGET_DOMAIN=ddns.${CF_DOMAIN}
+      - DOMAIN1=${CF_DOMAIN}
+      - DOMAIN1_ZONE_ID=${CF_DOMAIN_ZONE_ID}
+      - DOMAIN1_PROXIED=true
     labels:
-      # Add hosts specified in rules here to force cf-companion to create the CNAMEs
-      # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps
-      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`console-buildquest.alexpedersen.dev`) || HostHeader(`api-buildquest.alexpedersen.dev`) || HostHeader(`metrics-home.alexpedersen.dev`)"
+      - "traefik.enable=false"
+    #   # Add hosts specified in rules here to force cf-companion to create the CNAMEs
+    #   # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps, or load balancers from fileprovider
+    #   - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`external-loadbalanced-app.${CF_DOMAIN}`)"
+  # Cloudflare dynamic DNS
   cf-ddns:
     container_name: cf-ddns
     image: oznu/cloudflare-ddns:latest
     restart: always
     environment:
-      - API_KEY=${CLOUDFLARE_API_KEY}
-      - ZONE=${CLOUDFLARE_ZONE}
+      - API_KEY=${CF_DNS_API_TOKEN}
+      - ZONE=${CF_DOMAIN}
       - SUBDOMAIN=ddns
       - PROXIED=true
       - RRTYPE=A
       - DELETE_ON_STOP=false
       - DNS_SERVER=1.1.1.1
+    labels:
+      - "traefik.enable=false"

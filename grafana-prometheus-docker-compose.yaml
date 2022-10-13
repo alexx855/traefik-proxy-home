@@ -1,13 +1,4 @@
 version: '3.7'
-networks:
-  proxy:
-    external:
-      name: proxy
-volumes:
-  prometheus_data:
-    name: prometheus_data
-  grafana_data:
-    name: grafana_data
 services:
   prometheus:
     image: prom/prometheus
@@ -20,40 +11,35 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-    networks:
-      - proxy
     labels:
       - traefik.enable=true
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${CLOUDFLARE_ZONE}`)"
+      # - "traefik.http.routers.prometheus.middlewares=basic-auth@docker"
+      # - "traefik.http.routers.prometheus.middlewares=test-basic-auth@file"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${CF_DOMAIN}`)"
       - "traefik.http.routers.prometheus.service=prometheus"
       - "traefik.http.routers.prometheus.entrypoints=web-secure"
       - "traefik.http.routers.prometheus.tls=true"
       - "traefik.http.routers.prometheus.tls.certresolver=le"
-      - "traefik.http.routers.prometheus.middlewares=basic-auth@docker"
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
-      - "traefik.docker.network=proxy"
   grafana:
     image: grafana/grafana
     depends_on:
       - prometheus
     volumes:
-      - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - grafana_data:/var/lib/grafana
     env_file:
-      - ./grafana/config.monitoring
-    networks:
-      - proxy
+      - ./.env
     labels:
       - traefik.enable=true
-      - "traefik.http.routers.grafana.rule=Host(`grafana.${CLOUDFLARE_ZONE}`)"
+      # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"
+      # - "traefik.http.routers.grafana.middlewares=test-basic-auth@file"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${CF_DOMAIN}`)"
       - "traefik.http.routers.grafana.service=grafana"
       - "traefik.http.routers.grafana.entrypoints=web-secure"
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=le"
-      # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"
-      # - "traefik.http.routers.grafana.middlewares=test-basic-auth@file"
       - "traefik.http.services.grafana.loadbalancer.server.port=3000"
-      - "traefik.docker.network=proxy"
   node_exporter:
     image: quay.io/prometheus/node-exporter:latest
     container_name: node_exporter
@@ -64,3 +50,8 @@ services:
     restart: unless-stopped
     volumes:
       - '/:/host:ro,rslave'
+volumes:
+  prometheus_data:
+    name: prometheus_data
+  grafana_data:
+    name: grafana_data

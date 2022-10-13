@@ -1,3 +1,2 @@
 .env
 traefik.log
-FileProvider/config.yaml

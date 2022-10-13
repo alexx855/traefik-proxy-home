@@ -1,0 +1,32 @@
+http:
+  # Add the router
+  routers:
+    # Define a connection between requests and services
+    whoami-local:
+      rule: "Host(`whoami.docker.localhost`)"
+      entryPoints:
+        - web
+      service: whoami-traefik-proxy-home@docker
+    whoami-dev:
+      rule: "Host(`whoami.alexpedersen.dev`)"
+      entryPoints:
+        - web-secure
+      service: whoami-traefik-proxy-home@docker
+      tls:
+        certResolver: le
+
+  # Add the middleware
+  middlewares:
+    my-basic-auth:
+      basicAuth:
+        users:
+        - test:$apr1$H6uskkkW$IgXLP6ewTrSuBkTrqE8wj/
+        - test2:$apr1$d9hr9HBB$4HxwgUir3HP4EsggP/QNo0
+
+  # Add the service
+  services:
+    # Define how to reach an existing service on our infrastructure
+    whoami:
+      loadBalancer:
+        servers:
+        - url: http://172.20.0.5:80

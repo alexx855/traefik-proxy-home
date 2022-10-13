@@ -32,22 +32,10 @@ scrape_configs:
     # Override the global default and scrape targets from this job every 5 seconds.
     scrape_interval: 5s
     static_configs:
-      - targets: ["localhost:9090"]
+      - targets: ["127.0.0.1:9090"]
   - job_name: "node"
     static_configs:
-      - targets: ["172.17.0.1:9100"]
+      - targets: ["127.0.0.1:9100"]
   - job_name: "traefik"
     static_configs:
-      - targets: ["172.17.0.1:8080"]
-    # dns_sd_configs:
-      # - names:
-      #     - "tasks.traefik"
-      #   type: "A"
-      #   port: 8080
-  # ? add
-  # - job_name: 'trex'
-  #   static_configs:
-  #        - targets: ['localhost:9091', '172.17.0.1:9091']
-  # - job_name: 'chia'
-  #   static_configs:
-  #        - targets: ['localhost:9092', '172.17.0.1:9092']
+      - targets: ["127.0.0.1:8080"]
