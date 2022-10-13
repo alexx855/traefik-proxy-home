@@ -4,35 +4,30 @@ services:
     image: traefik:latest
     restart: unless-stopped
     command:
-      - "--entrypoints.web.address=:80"
+      # - "--entrypoints.web.address=:80"
       - "--entrypoints.web-secure.address=:443"
       # http to https redirect
-      - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
+      # - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--log.level=DEBUG"
       - "--api.dashboard=true"
       - "--api.insecure=false"
       - "--providers.docker=true"
       - "--providers.file.watch=true"
       - "--providers.file.directory=/FileProvider/"
-      - "--providers.docker.swarmMode=false"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-      - "--providers.docker.exposedbydefault=true"
+      - "--providers.docker.exposedbydefault=false"
       - "--serverstransport.insecureskipverify=false"
       - "--certificatesresolvers.le.acme.dnschallenge=true"
       - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
       - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53"
-      # Prometheus  
+      - "--tracing.datadog=true"
+      - "--accesslog.filepath=/logs/access.log"
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
-      - "--entryPoints.metrics.address=:8080"
-      - "--metrics.prometheus.entryPoint=metrics"
       - "--metrics.prometheus.manualrouting=true"
-      # TODO: test datadog instead of prometheus, it has tracing support
-      # - "--metrics.datadog=true"
-      # - "--metrics.datadog.pushInterval=10s"
-      # - "--tracing.datadog=true"
+      - "--metrics.prometheus.entryPoint=metrics"
     environment:
       CF_API_EMAIL: ${CF_API_EMAIL}
       CF_API_KEY: ${CF_API_KEY}
@@ -40,31 +35,36 @@ services:
     container_name: traefik
     labels:
       - "traefik.enable=true"
+      # dashboard
       - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.${CF_DOMAIN}`)"
       - "traefik.http.routers.traefik-rtr.entrypoints=web-secure"
       - "traefik.http.routers.traefik-rtr.tls=true"
       - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
       - "traefik.http.routers.traefik-rtr.service=api@internal"
-      # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"
-      # - "traefik.http.routers.grafana.middlewares=test-basic-auth@file"
+      # prometheus metrics
+      - "traefik.http.routers.metrics.rule=Host(`traefik.${CF_DOMAIN}`) && PathPrefix(`/metrics`)"
+      - "traefik.http.routers.metrics.entrypoints=web-secure"
+      - "traefik.http.routers.metrics.tls=true"
+      - "traefik.http.routers.metrics.tls.certresolver=le"
+      - "traefik.http.routers.metrics.service=prometheus@internal"
     ports:
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
+      # - target: 80
+      #   published: 80
+      #   protocol: tcp
+      #   mode: host
       - target: 443
         published: 443
         protocol: tcp
         mode: host
-      # # traefik dashboard
       # - target: 8080
       #   published: 8080
-      #   # protocol: tcp
-      #   mode: ingress 
+      #   protocol: tcp
+      #   mode: host 
 
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock" # So Traefik can listen to the Docker events
       - ./FileProvider/:/FileProvider/ # So Traefik can read the dynamic configuration file
+      - ./logs/:/logs/
   # Cloudflare automatic CNAME DNS creation
   cf-companion:
     container_name: cf-companion
@@ -80,11 +80,10 @@ services:
       - DOMAIN1=${CF_DOMAIN}
       - DOMAIN1_ZONE_ID=${CF_DOMAIN_ZONE_ID}
       - DOMAIN1_PROXIED=true
-    labels:
-      - "traefik.enable=false"
+    # labels:
     #   # Add hosts specified in rules here to force cf-companion to create the CNAMEs
     #   # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps, or load balancers from fileprovider
-    #   - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`external-loadbalanced-app.${CF_DOMAIN}`)"
+    #   - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`node.${CF_DOMAIN}`)"
   # Cloudflare dynamic DNS
   cf-ddns:
     container_name: cf-ddns
@@ -98,5 +97,48 @@ services:
       - RRTYPE=A
       - DELETE_ON_STOP=false
       - DNS_SERVER=1.1.1.1
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      # - '--collector.systemd --collector.processes'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
     labels:
-      - "traefik.enable=false"
+      - traefik.enable=true
+      # - "traefik.http.routers.prometheus.middlewares=basic-auth@docker"
+      # - "traefik.http.routers.prometheus.middlewares=test-basic-auth@file"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.${CF_DOMAIN}`)"
+      - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.routers.prometheus.entrypoints=web-secure"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.certresolver=le"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+  grafana:
+    image: grafana/grafana
+    depends_on:
+      - prometheus
+    volumes:
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - grafana_data:/var/lib/grafana
+    env_file:
+      - ./.env
+    labels:
+      - traefik.enable=true
+      # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"
+      # - "traefik.http.routers.grafana.middlewares=test-basic-auth@file"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.${CF_DOMAIN}`)"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.routers.grafana.entrypoints=web-secure"
+      - "traefik.http.routers.grafana.tls=true"
+      - "traefik.http.routers.grafana.tls.certresolver=le"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+volumes:
+  prometheus_data:
+    name: prometheus_data
+  grafana_data:
+    name: grafana_data

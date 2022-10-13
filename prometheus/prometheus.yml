@@ -33,9 +33,11 @@ scrape_configs:
     scrape_interval: 5s
     static_configs:
       - targets: ["127.0.0.1:9090"]
-  - job_name: "node"
-    static_configs:
-      - targets: ["127.0.0.1:9100"]
   - job_name: "traefik"
+    scheme: https
     static_configs:
-      - targets: ["127.0.0.1:8080"]
+      - targets: ["traefik.alexpedersen.dev"]
+  - job_name: "grafana"
+    scheme: https
+    static_configs:
+      - targets: ["grafana.alexpedersen.dev"]
