@@ -72,7 +72,7 @@ services:
   cf-companion:
     container_name: cf-companion
     image: tiredofit/traefik-cloudflare-companion:latest
-    restart: always
+    restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
@@ -91,7 +91,7 @@ services:
   cf-ddns:
     container_name: cf-ddns
     image: oznu/cloudflare-ddns:latest
-    restart: always
+    restart: unless-stopped
     environment:
       - API_KEY=${CF_DNS_API_TOKEN}
       - ZONE=${CF_DOMAIN}
@@ -102,6 +102,7 @@ services:
       - DNS_SERVER=1.1.1.1
   prometheus:
     image: prom/prometheus
+    restart: unless-stopped
     volumes:
       - ./prometheus/:/etc/prometheus/
       - prometheus_data:/prometheus
@@ -123,6 +124,7 @@ services:
       - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
   grafana:
     image: grafana/grafana
+    restart: unless-stopped
     depends_on:
       - prometheus
     volumes:
