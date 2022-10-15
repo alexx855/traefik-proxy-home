@@ -1,7 +1,6 @@
 version: '3.7'
-
 services:
-  whoami_alex:
+  whoami:
     image: containous/whoami
     labels:
       - "traefik.enable=true"
@@ -9,9 +8,3 @@ services:
       - "traefik.http.routers.whoami.entrypoints=web-secure"
       - "traefik.http.routers.whoami.tls=true"
       - "traefik.http.routers.whoami.tls.certresolver=le"
-    networks:
-      - proxy
-networks:
-  proxy:
-    external:
-      name: proxy
