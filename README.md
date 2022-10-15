@@ -1,4 +1,6 @@
-# Traefik with Docker and File providers
+Proxy you local network (you could need to open the port 433) with traefik and cloudflare ddns.
+
+## Demo dashboard
 ![traefik_demo](https://raw.githubusercontent.com/alexx855/traefik-proxy-home/master/traefik-demo.jpg)
 
 ## Create custom env file
