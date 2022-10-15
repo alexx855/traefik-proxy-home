@@ -22,12 +22,12 @@ services:
       - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
       - "--certificatesresolvers.le.acme.dnschallenge.resolvers=1.1.1.1:53"
-      - "--tracing.datadog=true"
       - "--accesslog.filepath=/logs/access.log"
       - "--metrics.prometheus=true"
       - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
       - "--metrics.prometheus.manualrouting=true"
       - "--metrics.prometheus.entryPoint=metrics"
+      # - "--tracing.datadog=true"
     environment:
       CF_API_EMAIL: ${CF_API_EMAIL}
       CF_API_KEY: ${CF_API_KEY}
