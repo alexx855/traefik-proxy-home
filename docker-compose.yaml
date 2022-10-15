@@ -10,6 +10,8 @@ services:
       # - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
       # - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--log.level=DEBUG"
+      # - "--log.filePath=/path/to/traefik.log"
+      # - "--log.format=json"
       - "--api.dashboard=true"
       - "--api.insecure=false"
       - "--providers.docker=true"
@@ -34,6 +36,7 @@ services:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
     container_name: traefik
     labels:
+      ## Services - API
       - "traefik.enable=true"
       # dashboard
       - "traefik.http.routers.traefik-rtr.rule=Host(`traefik.${CF_DOMAIN}`)"
@@ -125,8 +128,10 @@ services:
     volumes:
       - ./grafana/provisioning/:/etc/grafana/provisioning/
       - grafana_data:/var/lib/grafana
-    env_file:
-      - ./.env
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: ${GF_USERS_ALLOW_SIGN_UP}
+      GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS}
     labels:
       - traefik.enable=true
       # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"

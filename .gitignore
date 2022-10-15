@@ -1,4 +1,5 @@
 .env
 traefik.log
 FileProvider/config.yaml
+grafana/provisioning/datasources/datasource.yml
 logs/*.log
