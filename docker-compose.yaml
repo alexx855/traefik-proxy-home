@@ -30,6 +30,11 @@ services:
       - "--metrics.prometheus.manualrouting=true"
       - "--metrics.prometheus.entryPoint=metrics"
       # - "--tracing.datadog=true"
+      # Enable Hub communication (open the port 9900 and 9901 by default)
+      - --experimental.hub=true
+      # - --hub
+      - --hub.tls.insecure=true
+      - --metrics.prometheus.addrouterslabels=true
     environment:
       CF_API_EMAIL: ${CF_API_EMAIL}
       CF_API_KEY: ${CF_API_KEY}
@@ -68,6 +73,22 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock" # So Traefik can listen to the Docker events
       - ./FileProvider/:/FileProvider/ # So Traefik can read the dynamic configuration file
       - ./logs/:/logs/
+  # Start the agent with the latest version
+  hub-agent:
+    image: ghcr.io/traefik/hub-agent-traefik:v1.0.0
+    pull_policy: always
+    container_name: hub-agent
+    restart: "on-failure"
+    command:
+      - run
+      - --hub.token=${TRAEFIK_AGENT_TOKEN}
+      - --auth-server.advertise-url=http://hub-agent
+      - --traefik.host=traefik
+      - --traefik.tls.insecure=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - traefik
   # Cloudflare automatic CNAME DNS creation
   cf-companion:
     container_name: cf-companion
