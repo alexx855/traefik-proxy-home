@@ -29,7 +29,7 @@ services:
       - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
       - "--metrics.prometheus.manualrouting=true"
       - "--metrics.prometheus.entryPoint=metrics"
-      # - "--tracing.datadog=true"
+      - "--tracing.datadog=true"
       # Enable Hub communication (open the port 9900 and 9901 by default)
       - --experimental.hub=true
       # - --hub
