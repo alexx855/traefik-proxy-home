@@ -7,8 +7,8 @@ services:
       # - "--entrypoints.web.address=:80"
       - "--entrypoints.web-secure.address=:443"
       # http to https redirect
-      # - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
-      # - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--log.level=DEBUG"
       # - "--log.filePath=/path/to/traefik.log"
       # - "--log.format=json"
@@ -49,6 +49,7 @@ services:
       - "traefik.http.routers.traefik-rtr.tls=true"
       - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
       - "traefik.http.routers.traefik-rtr.service=api@internal"
+      - "traefik.http.routers.traefik-rtr.middlewares=basi-auth@hub"
       # prometheus metrics
       - "traefik.http.routers.metrics.rule=Host(`traefik.${CF_DOMAIN}`) && PathPrefix(`/metrics`)"
       - "traefik.http.routers.metrics.entrypoints=web-secure"
@@ -129,14 +130,11 @@ services:
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      # - '--collector.systemd --collector.processes'
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     labels:
       - traefik.enable=true
-      # - "traefik.http.routers.prometheus.middlewares=basic-auth@docker"
-      # - "traefik.http.routers.prometheus.middlewares=test-basic-auth@file"
       - "traefik.http.routers.prometheus.rule=Host(`prometheus.${CF_DOMAIN}`)"
       - "traefik.http.routers.prometheus.service=prometheus"
       - "traefik.http.routers.prometheus.entrypoints=web-secure"
@@ -157,8 +155,6 @@ services:
       GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS}
     labels:
       - traefik.enable=true
-      # - "traefik.http.routers.grafana.middlewares=basic-auth@docker"
-      # - "traefik.http.routers.grafana.middlewares=test-basic-auth@file"
       - "traefik.http.routers.grafana.rule=Host(`grafana.${CF_DOMAIN}`)"
       - "traefik.http.routers.grafana.service=grafana"
       - "traefik.http.routers.grafana.entrypoints=web-secure"
