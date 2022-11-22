@@ -1,14 +1,15 @@
-version: '3.7'
+version: '3.9'
 services:
   traefik:
     image: traefik:latest
     restart: unless-stopped
     command:
-      # - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.address=:80"
       - "--entrypoints.web-secure.address=:443"
       # http to https redirect
       - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
       - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      # global redirect to https
       - "--log.level=DEBUG"
       # - "--log.filePath=/path/to/traefik.log"
       # - "--log.format=json"
@@ -19,7 +20,7 @@ services:
       - "--providers.file.directory=/FileProvider/"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedbydefault=false"
-      - "--serverstransport.insecureskipverify=false"
+      # - "--serverstransport.insecureskipverify=true"
       - "--certificatesresolvers.le.acme.dnschallenge=true"
       - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
@@ -29,11 +30,7 @@ services:
       - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
       - "--metrics.prometheus.manualrouting=true"
       - "--metrics.prometheus.entryPoint=metrics"
-      - "--tracing.datadog=true"
-      # Enable Hub communication (open the port 9900 and 9901 by default)
-      - --experimental.hub=true
-      # - --hub
-      - --hub.tls.insecure=true
+      # - "--tracing.datadog=true"
       - --metrics.prometheus.addrouterslabels=true
     environment:
       CF_API_EMAIL: ${CF_API_EMAIL}
@@ -49,7 +46,6 @@ services:
       - "traefik.http.routers.traefik-rtr.tls=true"
       - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
       - "traefik.http.routers.traefik-rtr.service=api@internal"
-      - "traefik.http.routers.traefik-rtr.middlewares=basi-auth@hub"
       # prometheus metrics
       - "traefik.http.routers.metrics.rule=Host(`traefik.${CF_DOMAIN}`) && PathPrefix(`/metrics`)"
       - "traefik.http.routers.metrics.entrypoints=web-secure"
@@ -74,22 +70,6 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock" # So Traefik can listen to the Docker events
       - ./FileProvider/:/FileProvider/ # So Traefik can read the dynamic configuration file
       - ./logs/:/logs/
-  # Start the agent with the latest version
-  hub-agent:
-    image: ghcr.io/traefik/hub-agent-traefik:v1.0.0
-    pull_policy: always
-    container_name: hub-agent
-    restart: "on-failure"
-    command:
-      - run
-      - --hub.token=${TRAEFIK_AGENT_TOKEN}
-      - --auth-server.advertise-url=http://hub-agent
-      - --traefik.host=traefik
-      - --traefik.tls.insecure=true
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - traefik
   # Cloudflare automatic CNAME DNS creation
   cf-companion:
     container_name: cf-companion
