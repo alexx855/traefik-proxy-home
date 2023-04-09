@@ -2,16 +2,11 @@ http:
   # Add the router
   routers:
     # Define a connection between requests and services
-    whoami-local:
-      rule: "Host(`whoami.docker.localhost`)"
-      entryPoints:
-        - web
-      service: whoami-traefik-proxy-home@docker
-    whoami-dev:
-      rule: "Host(`whoami.alexpedersen.dev`)"
+    discord-bot:
+      rule: "Host(`discord.alexpedersen.dev`)"
       entryPoints:
         - web-secure
-      service: whoami-traefik-proxy-home@docker
+      service: discord-bot
       tls:
         certResolver: le
 
@@ -26,7 +21,7 @@ http:
   # Add the service
   services:
     # Define how to reach an existing service on our infrastructure
-    whoami:
+    discord-bot:
       loadBalancer:
         servers:
-        - url: http://172.20.0.5:80
+        - url: http://host.docker.internal:3000
