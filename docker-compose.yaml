@@ -5,21 +5,21 @@ services:
     restart: unless-stopped
     command:
       - "--api.insecure=true"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.web-secure.address=:443"
+      # - "--entrypoints.web.address=:80"
       # force http to https redirection
       # - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
       # - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web-secure.address=:443"
+      - "--log.filePath=/logs/traefik.log"
       - "--log.level=DEBUG"
-      # - "--log.filePath=/path/to/traefik.log"
-      # - "--log.format=json"
+      - "--log.format=json"
       - "--api.dashboard=true"
       - "--providers.docker=true"
       - "--providers.file.watch=true"
       - "--providers.file.directory=/FileProvider/"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedbydefault=false"
-      # - "--serverstransport.insecureskipverify=true"
+      - "--serverstransport.insecureskipverify=false"
       - "--certificatesresolvers.le.acme.dnschallenge=true"
       - "--certificatesresolvers.le.acme.dnschallenge.provider=cloudflare"
       - "--certificatesresolvers.le.acme.dnschallenge.delaybeforecheck=10"
@@ -29,8 +29,8 @@ services:
       - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
       - "--metrics.prometheus.manualrouting=true"
       - "--metrics.prometheus.entryPoint=metrics"
-      # - "--tracing.datadog=true"
-      - --metrics.prometheus.addrouterslabels=true
+      - "--metrics.prometheus.addrouterslabels=true"
+      - "--tracing.datadog=true"
     environment:
       CF_API_EMAIL: ${CF_API_EMAIL}
       CF_API_KEY: ${CF_API_KEY}
@@ -44,32 +44,28 @@ services:
       - "traefik.http.routers.traefik-rtr.tls=true"
       - "traefik.http.routers.traefik-rtr.tls.certresolver=le"
       - "traefik.http.routers.traefik-rtr.service=api@internal"
-      # prometheus metrics (optional)
-      - "traefik.http.routers.metrics.rule=Host(`traefik.${CF_DOMAIN}`) && PathPrefix(`/metrics`)"
-      - "traefik.http.routers.metrics.entrypoints=web-secure"
-      - "traefik.http.routers.metrics.tls=true"
-      - "traefik.http.routers.metrics.tls.certresolver=le"
-      - "traefik.http.routers.metrics.service=prometheus@internal"
+      # add basic auth to dashboard
+      - "traefik.http.routers.traefik-rtr.middlewares=traefik-auth"
     ports:
       # web entrypoint 
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
+      # - target: 80
+      #   published: 80
+      #   protocol: tcp
+      #   mode: host
       # web-secure entrypoint
       - target: 443
         published: 443
         protocol: tcp
         mode: host
       # dashboard
-      - target: 8080
-        published: 8080
-        protocol: tcp
-        mode: host 
+      # - target: 8080
+      #   published: 8080
+      #   protocol: tcp
+      #   mode: host 
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock" # So Traefik can listen to the Docker events
       - ./FileProvider/:/FileProvider/ # So Traefik can read the dynamic configuration file
-      - ./logs/:/logs/
+      - ./logs/:/logs/ # So Traefik can write logs
   # Cloudflare automatic CNAME DNS creation
   cf-companion:
     container_name: cf-companion
@@ -88,7 +84,7 @@ services:
     labels:
       # Add hosts specified in rules here to force cf-companion to create the CNAMEs
       # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps, or load balancers from fileprovider
-      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`discord.${CF_DOMAIN}`)"
+      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`infsoccadm.${CF_DOMAIN}`) || `discord.${CF_DOMAIN}`) || HostHeader(`tac.${CF_DOMAIN}`) ||  HostHeader(`wc.${CF_DOMAIN}`) || HostHeader(`surfscdev.${CF_DOMAIN}`) || HostHeader(`rpc.${CF_DOMAIN}`) || HostHeader(`nakama.${CF_DOMAIN}`)"
   # Cloudflare dynamic DNS
   cf-ddns:
     container_name: cf-ddns
@@ -102,4 +98,3 @@ services:
       - RRTYPE=A
       - DELETE_ON_STOP=false
       - DNS_SERVER=1.1.1.1
-  
