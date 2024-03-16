@@ -2,6 +2,16 @@ http:
   # Add the router
   routers:
     # Define a connection between requests and services
+    traefik-rtr:
+      middlewares:
+        - file-basic-auth
+      rule: "Host(`traefik.alexpedersen.dev`)"
+      entryPoints:
+        - web-secure
+      service: api@internal
+      tls:
+        certResolver: le
+
     discord-bot:
       rule: "Host(`discord.alexpedersen.dev`)"
       entryPoints:
