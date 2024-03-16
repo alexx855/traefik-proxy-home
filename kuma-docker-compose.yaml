@@ -1,0 +1,25 @@
+version: '3.7'
+services:
+  uptime:
+    image: louislam/uptime-kuma:1
+    restart: always
+    volumes:
+      - ./uptime-kuma:/app/data
+    ports:
+      - "3001:3001"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kuma.rule=Host(`kuma.alexpedersen.dev`)"
+      - "traefik.http.routers.kuma.entrypoints=web-secure"
+      - "traefik.http.routers.kuma.tls=true"
+      - "traefik.http.routers.kuma.tls.certresolver=le"
+      - "traefik.docker.network=traefik-proxy-home_default"
+      - "traefik.port=3001"
+    networks:
+      - internal
+      - traefik-proxy-home_default
+networks:
+  traefik-proxy-home_default:
+    external: true
+  internal:
+    external: false

@@ -4,3 +4,4 @@ FileProvider/config.yaml
 grafana/provisioning/datasources/datasource.yml
 grafana/grafana.ini
 logs/*.log
+uptime-kuma/*
