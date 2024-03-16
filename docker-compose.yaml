@@ -4,7 +4,7 @@ services:
     image: traefik:latest
     restart: unless-stopped
     command:
-      - "--api.insecure=true"
+      - "--api.insecure=false"
       # - "--entrypoints.web.address=:80"
       # force http to https redirection
       # - "--entrypoints.web.http.redirections.entryPoint.to=web-secure"
@@ -81,10 +81,10 @@ services:
       - DOMAIN1=${CF_DOMAIN}
       - DOMAIN1_ZONE_ID=${CF_DOMAIN_ZONE_ID}
       - DOMAIN1_PROXIED=true
-    labels:
+    # labels:
       # Add hosts specified in rules here to force cf-companion to create the CNAMEs
       # Since cf-companion creates CNAMEs based on host rules, this a workaround for non-docker/external apps, or load balancers from fileprovider
-      - "traefik.http.routers.cf-companion-rtr.rule=HostHeader(`infsoccadm.${CF_DOMAIN}`) || `discord.${CF_DOMAIN}`) || HostHeader(`tac.${CF_DOMAIN}`) ||  HostHeader(`wc.${CF_DOMAIN}`) || HostHeader(`surfscdev.${CF_DOMAIN}`) || HostHeader(`rpc.${CF_DOMAIN}`) || HostHeader(`nakama.${CF_DOMAIN}`)"
+      # - "traefik.http.routers.cf-companion-rtr.rule=HostHeader( HostHeader(`wc.${CF_DOMAIN}`) || HostHeader(`rpc.${CF_DOMAIN}`))"
   # Cloudflare dynamic DNS
   cf-ddns:
     container_name: cf-ddns
